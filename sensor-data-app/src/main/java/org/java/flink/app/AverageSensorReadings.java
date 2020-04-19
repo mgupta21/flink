@@ -1,4 +1,4 @@
-package org.java.flink;
+package org.java.flink.app;
 
 import org.apache.flink.streaming.api.TimeCharacteristic;
 import org.apache.flink.streaming.api.datastream.DataStream;
@@ -8,6 +8,7 @@ import org.apache.flink.streaming.api.windowing.time.Time;
 import org.apache.flink.streaming.api.windowing.windows.TimeWindow;
 import org.apache.flink.util.Collector;
 import org.java.flink.datamodel.SensorReading;
+import org.java.flink.source.SensorSource;
 
 public class AverageSensorReadings {
 
@@ -20,6 +21,11 @@ public class AverageSensorReadings {
      */
     public static void main(String[] args) throws Exception {
 
+        // The execution environment determines whether the program is running on a local machine or on a cluster
+        // StreamExecutionEnvironment.createLocalEnvironment();
+        // config: Host name of Job manager, port of job manager process, jar file to ship to Jab Manager
+        // StreamExecutionEnvironment.createRemoteEnvironment("host", 1234, "path/to/jarFile.jar");
+
         // set up the streaming execution environment
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
 
@@ -29,26 +35,29 @@ public class AverageSensorReadings {
         env.getConfig().setAutoWatermarkInterval(1000L);
 
         // ingest sensor stream
+        // Assigning watermarks at source
         DataStream<SensorReading> sensorData = env
             // SensorSource generates random temperature readings
             .addSource(new SensorSource())
             // assign timestamps and watermarks which are required for event time
             .assignTimestampsAndWatermarks(new SensorTimeAssigner());
 
+        // Some transformations can produce a new DataStream, possibly of a different type, while other transformations do not modify the records of
+        // the DataStream but reorganize it by partitioning or grouping.
         DataStream<SensorReading> avgTemp = sensorData
-            // convert Fahrenheit to Celsius using and inlined map function
+            // transformation to convert Fahrenheit to Celsius using and inlined map function
             .map(r -> new SensorReading(r.id, r.timestamp, (r.temperature - 32) * (5.0 / 9.0)))
-            // organize stream by sensor
+            // transformation to partition the sensor readings by their id. organize stream by sensor id
             .keyBy(r -> r.id)
-            // group readings in 1 second windows
+            // transformation to group the sensor readings of each sensor ID partition into tumbling windows of 1 second
             .timeWindow(Time.seconds(1))
-            // compute average temperature using a user-defined function
+            // compute average temperature using a user-defined window function
             .apply(new TemperatureAverager());
 
         // print result stream to standard out
         avgTemp.print();
 
-        // execute application
+        // Flink programs are executed lazily. Only when execute() is called does the system trigger the execution of the program.
         env.execute("Compute average sensor temperature");
     }
 
@@ -81,7 +90,7 @@ public class AverageSensorReadings {
             }
             double avgTemp = sum / cnt;
 
-            // emit a SensorReading with the average temperature
+            // emit a SensorReading with the average temperature and timestamp of window end
             out.collect(new SensorReading(sensorId, window.getEnd(), avgTemp));
         }
     }

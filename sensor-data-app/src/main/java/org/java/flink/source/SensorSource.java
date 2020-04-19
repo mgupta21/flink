@@ -1,4 +1,4 @@
-package org.java.flink;
+package org.java.flink.source;
 
 import java.util.Calendar;
 import java.util.Random;
@@ -28,7 +28,7 @@ public class SensorSource extends RichParallelSourceFunction<SensorReading> {
         // look up index of this parallel task
         int taskIdx = this.getRuntimeContext().getIndexOfThisSubtask();
 
-        // initialize sensor ids and temperatures
+        // initialize 10 sensor ids and temperatures for given task
         String[] sensorIds = new String[10];
         double[] curFTemp = new double[10];
         for (int i = 0; i < 10; i++) {
@@ -36,6 +36,7 @@ public class SensorSource extends RichParallelSourceFunction<SensorReading> {
             curFTemp[i] = 65 + (rand.nextGaussian() * 20);
         }
 
+        // generate sensor readings for 10 sensors of this task every 100 ms
         while (running) {
 
             // get current time

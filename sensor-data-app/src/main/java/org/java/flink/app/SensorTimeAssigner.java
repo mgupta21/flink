@@ -1,4 +1,4 @@
-package org.java.flink;
+package org.java.flink.app;
 
 import org.apache.flink.streaming.api.functions.timestamps.BoundedOutOfOrdernessTimestampExtractor;
 import org.apache.flink.streaming.api.windowing.time.Time;
